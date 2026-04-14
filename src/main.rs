@@ -21,6 +21,8 @@ type ScanResult = (String, i64, i64, String, bool);
 struct Args {
     #[arg(short, long, default_value_t = 300)]
     concurrency: usize,
+    #[arg(short, long, default_value_t = false)]
+    debug: bool,
     #[arg(short, long, default_value = "input.txt")]
     input: String,
     #[arg(short, long, default_value = "output.txt")]
@@ -33,7 +35,11 @@ struct Args {
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let args = Args::parse();
     tracing_subscriber::fmt()
-        .with_env_filter("mcscanner=info")
+        .with_env_filter(if args.debug {
+            "mcscanner=debug"
+        } else {
+            "mcscanner=info"
+        })
         .init();
 
     info!("mcscanner-rs");

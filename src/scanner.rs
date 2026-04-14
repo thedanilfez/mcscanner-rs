@@ -20,7 +20,7 @@ pub async fn scan(
     let con = format!("{}:{}", host, port);
     let mut stream =
         tokio::time::timeout(Duration::from_millis(2500), TcpStream::connect(&con)).await??;
-    let handshake = packets::handshake(host, port, 765);
+    let handshake = packets::handshake(host, port, 765, 1);
 
     send_packet(&mut stream, &handshake).await?;
     send_packet(&mut stream, &[0x00]).await?;
@@ -60,7 +60,7 @@ async fn is_whitelisted(
     )
     .await??;
 
-    let handshake = packets::handshake(host, port, proto);
+    let handshake = packets::handshake(host, port, proto, 2);
     send_packet(&mut stream, &handshake).await?;
 
     // login packet
@@ -69,20 +69,18 @@ async fn is_whitelisted(
     send_packet(&mut stream, &login).await?;
 
     // received
-    let _len = read_varint(&mut stream).await?;
+    let len = read_varint(&mut stream).await?;
     let id = read_varint(&mut stream).await?;
 
-    // 0x00 - disconnected
-    if id == 0x00 {
-        let reason = read_string(&mut stream).await?;
-        if reason.contains("Internal Exception") {
-            debug!(
-                "Error while reading login packet: {} | Protocol: {}",
-                reason, proto
-            )
-        }
-        return Ok(true);
-    }
+    debug!("[{}] len: {} id: {:#04x}", host, len, id);
 
-    Ok(false)
+    match id {
+        // 0x00 - Disconnected
+        0x00 => return Ok(true),
+        // 0x01 - encryption request (online mode)
+        0x01 => return Ok(true),
+        // 0x03 - Success
+        0x03 => return Ok(false),
+        _ => return Ok(true),
+    }
 }
