@@ -19,4 +19,4 @@ cargo build --release
 + `-p --port <PORT>` - Port to scan
 
 ## License
-This project is licensed under the [GNU GPLv3]((https://www.gnu.org/licenses/gpl-3.0.en.html))
+This project is licensed under the [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html)

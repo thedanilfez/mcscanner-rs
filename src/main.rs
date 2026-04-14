@@ -1,7 +1,7 @@
 use crate::scanner::scan;
 use clap::Parser;
 use ipnet::Ipv4Net;
-use std::str::FromStr;
+use std::net::Ipv4Addr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::fs::OpenOptions;
@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let ranges: Vec<String> = input.lines().map(|s| s.to_string()).collect();
 
-    info!("got {} ranges!", ranges.len());
+    info!("got {} targets!", ranges.len());
 
     let start = Instant::now();
     let limit = Arc::new(Semaphore::new(args.concurrency));
@@ -67,7 +67,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     });
 
     for range_str in &ranges {
-        let net = Ipv4Net::from_str(range_str).unwrap();
+        let net: Ipv4Net = range_str
+            .parse()
+            .or_else(|_| range_str.parse::<Ipv4Addr>().map(Ipv4Net::from))
+            .expect("Invalid IP");
         for ip in net.hosts() {
             let target = format!("{}:{}", ip, args.port);
             let permit = limit.clone().acquire_owned().await.unwrap();
