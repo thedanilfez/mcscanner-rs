@@ -1,4 +1,7 @@
 use crate::packets;
+use crate::protocol::read_compressed_packet;
+use crate::protocol::read_string_from_cursor;
+use crate::protocol::read_varint_from_cursor;
 use crate::protocol::send_packet;
 use crate::protocol::{read_string, read_varint};
 use serde_json::Value;
@@ -44,7 +47,13 @@ pub async fn scan(
         .to_string();
     drop(stream);
 
-    let wh = is_whitelisted(host, port, proto).await.unwrap_or(false);
+    let wh = match is_whitelisted(host, port, proto).await {
+        Ok(val) => val,
+        Err(e) => {
+            debug!("WL check failed for {}: {}", host, e);
+            true
+        }
+    };
 
     Ok((players, max, motd, wh))
 }
@@ -65,28 +74,67 @@ async fn is_whitelisted(
 
     // login packet
     let login = packets::login("Infernope", proto);
-
     send_packet(&mut stream, &login).await?;
 
-    // received
-    let len = read_varint(&mut stream).await?;
-    let id = read_varint(&mut stream).await?;
+    let mut current_threshold: i32 = -1;
 
-    debug!("[{}] len: {} id: {:#04x}", host, len, id);
+    loop {
+        let result = read_compressed_packet(&mut stream, current_threshold).await;
 
-    match id {
-        // 0x00 - Disconnected
-        0x00 => return Ok(true),
+        let (id, body) = match result {
+            Ok(res) => res,
+            Err(e) => {
+                if e.kind() == tokio::io::ErrorKind::UnexpectedEof {
+                    debug!(
+                        "[{}] Connection closed by server (EOF). Assuming Whitelist.",
+                        host
+                    );
+                    return Ok(true);
+                }
+                return Err(e.into());
+            }
+        };
 
-        // 0x01 - encryption request (online mode)
-        0x01 => return Ok(true),
+        match id {
+            0x03 => {
+                let mut cursor = std::io::Cursor::new(body);
+                current_threshold = read_varint_from_cursor(&mut cursor)?;
+                debug!(
+                    "[{}] Compression threshold set to: {}",
+                    host, current_threshold
+                );
+            }
+            0x00 => {
+                let mut cursor = std::io::Cursor::new(body);
 
-        // 0x02 - Set compression (Success) and LoginOK on <= 1.7.10
-        0x02 => return Ok(false),
+                let reason_json = match read_string_from_cursor(&mut cursor) {
+                    Ok(reason) => reason,
+                    Err(_) => "unknown".to_string(),
+                };
 
-        // 0x03 - Success
-        0x03 => return Ok(false),
+                let v: Value = serde_json::from_str(&reason_json).unwrap_or_default();
 
-        _ => return Ok(true),
+                let r = if let Some(text) = v["text"].as_str() {
+                    text.to_string()
+                } else if let Some(translate) = v["translate"].as_str() {
+                    match translate {
+                        "multiplayer.disconnect.not_whitelisted" => "Not whitelisted".to_string(),
+                        "multiplayer.disconnect.banned" => "Banned".to_string(),
+                        _ => translate.to_string(),
+                    }
+                } else {
+                    reason_json
+                };
+
+                debug!("[{}] Disconnected with reason: {}", host, r);
+
+                return Ok(true);
+            }
+            0x01 => return Ok(true),
+            0x02 => return Ok(false),
+            _ => {
+                debug!("[{}] Received packet {:#04x}, still waiting...", host, id);
+            }
+        }
     }
 }
