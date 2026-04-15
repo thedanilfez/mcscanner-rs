@@ -77,10 +77,16 @@ async fn is_whitelisted(
     match id {
         // 0x00 - Disconnected
         0x00 => return Ok(true),
+
         // 0x01 - encryption request (online mode)
         0x01 => return Ok(true),
+
+        // 0x02 - Set compression (Success) and LoginOK on <= 1.7.10
+        0x02 => return Ok(false),
+
         // 0x03 - Success
         0x03 => return Ok(false),
+
         _ => return Ok(true),
     }
 }
