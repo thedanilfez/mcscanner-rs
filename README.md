@@ -4,7 +4,7 @@ Minecraft server scanner written in rust
 ## Build
 ```bash
 git clone https://github.com/thedanilfez/mcscanner-rs.git
-cd mscanner-rs
+cd mcscanner-rs
 cargo build --release
 # ./target/release/mcscanner-rs
 ```

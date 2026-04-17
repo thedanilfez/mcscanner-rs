@@ -8,6 +8,7 @@ use serde_json::Value;
 use tokio::net::TcpStream;
 use tokio::time::Duration;
 use tracing::debug;
+use tracing::error;
 
 pub async fn scan(
     addr: &str,
@@ -85,10 +86,7 @@ async fn is_whitelisted(
             Ok(res) => res,
             Err(e) => {
                 if e.kind() == tokio::io::ErrorKind::UnexpectedEof {
-                    debug!(
-                        "[{}] Connection closed by server (EOF). Assuming Whitelist.",
-                        host
-                    );
+                    debug!("[{}] Closed due to EOF", host);
                     return Ok(true);
                 }
                 return Err(e.into());
@@ -112,6 +110,10 @@ async fn is_whitelisted(
                     Err(_) => "unknown".to_string(),
                 };
 
+                if reason_json.contains("Internal Exception") {
+                    error!("[{}] {} | protocol: {}", host, reason_json, proto)
+                }
+
                 let v: Value = serde_json::from_str(&reason_json).unwrap_or_default();
 
                 let r = if let Some(text) = v["text"].as_str() {
@@ -120,13 +122,17 @@ async fn is_whitelisted(
                     match translate {
                         "multiplayer.disconnect.not_whitelisted" => "Not whitelisted".to_string(),
                         "multiplayer.disconnect.banned" => "Banned".to_string(),
+                        "multiplayer.disconnect.outdated_client" => "Outdated client".to_string(),
                         _ => translate.to_string(),
                     }
                 } else {
                     reason_json
                 };
 
-                debug!("[{}] Disconnected with reason: {}", host, r);
+                debug!(
+                    "[{}] Disconnected with reason: {} | protocol: {}",
+                    host, r, proto,
+                );
 
                 return Ok(true);
             }
