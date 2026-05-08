@@ -19,16 +19,18 @@ type ScanResult = (String, i64, i64, String, bool);
 #[derive(Parser, Debug)]
 #[command(author, version, about = "mcscanner-rs")]
 struct Args {
-    #[arg(short, long, default_value_t = 300)]
+    #[arg(short, long, default_value_t = 300, help = "Maximum number of concurrent connections")]
     concurrency: usize,
-    #[arg(short, long, default_value_t = false)]
+    #[arg(short, long, default_value_t = false, help = "Enable debug logging")]
     debug: bool,
-    #[arg(short, long, default_value = "input.txt")]
+    #[arg(short, long, default_value = "input.txt", help = "Path to input file")]
     input: String,
-    #[arg(short, long, default_value = "output.txt")]
+    #[arg(short, long, default_value = "output.txt", help = "Path to output file")]
     output: String,
-    #[arg(short, long, default_value_t = 25565)]
+    #[arg(short, long, default_value_t = 25565, help = "Port to scan")]
     port: u16,
+    #[arg(short, long, default_value = "Infernope", help = "Bot username")]
+    username: String,
 }
 
 #[tokio::main]

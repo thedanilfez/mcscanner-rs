@@ -21,9 +21,8 @@ pub async fn scan(
         port_str.parse().unwrap_or(25565)
     };
 
-    let con = format!("{}:{}", host, port);
     let mut stream =
-        tokio::time::timeout(Duration::from_millis(2500), TcpStream::connect(&con)).await??;
+        tokio::time::timeout(Duration::from_millis(2500), TcpStream::connect((host, port))).await??;
     let handshake = packets::handshake(host, port, 765, 1);
 
     send_packet(&mut stream, &handshake).await?;
