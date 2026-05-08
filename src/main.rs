@@ -29,8 +29,6 @@ struct Args {
     output: String,
     #[arg(short, long, default_value_t = 25565, help = "Port to scan")]
     port: u16,
-    #[arg(short, long, default_value = "Infernope", help = "Bot username")]
-    username: String,
 }
 
 #[tokio::main]
